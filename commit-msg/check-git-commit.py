@@ -21,7 +21,7 @@ def check_format_rules(lineno, line):
         if len(line) > 50:
             return "E%d: First line is the HEADER.\n " \
                 " - HEADER is a single line of max. 50 characters that contains a \n" \
-                "  small description of the change. It contains a type, an optional \n" \
+                "  succinct description of the change. It contains a type, an optional \n" \
                 "  scope and a subject\n" \
                 "  + <type> describes the kind of change that this commit is providing. \n" \
                 "    Allowed types are:\n" \
@@ -85,5 +85,26 @@ while True:
     res = read_commit_message()
     commit_msg = res[0]
     errors = res[1]
-    print("Commt Message: %s" % (commit_msg));
-    print("Errors: %s" % (errors));
+    if errors:
+        print("-----------------------------------------------------------------------")
+        print("--------------------------- :COMMIT ERRORS: ---------------------------")
+        print("-----------------------------------------------------------------------")
+        with open(message_file, 'w') as commit_fd:
+            for line in commit_msg:
+                commit_fd.write(line)
+            commit_fd.write('%s\n' % (error_header,))
+            for error in errors:
+                print(error),
+                for eline in error.split('\n'):
+                    commit_fd.write('#    %s\n' % (eline,))
+
+        re_edit = input('-----------------------------------------------------------------------\n' \
+                'Invalid git commit message format. Would you like to re-edit it?' \
+                '\n-----------------------------------------------------------------------\n' \
+                '(If you answer no, your commit will fail) [Y/n] : ')
+        if re_edit in ('N', 'n', 'NO', 'no', 'No', 'nO'):
+            sys.exit(1)
+        if re_edit in ('Y', 'y', 'Yes', 'YEs', 'YES', 'YEs', 'yeS', 'yEs'):
+            call('%s %s' % (editor, message_file), shell=True)
+        continue
+    break
