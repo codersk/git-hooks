@@ -11,6 +11,9 @@ if "EDITOR" in os.environ.keys():
 else:
     editor = "/usr/bin/nano"
 
+message_file = sys.argv[1]
+error_header = '# GIT COMMIT MESSAGE FORMAT ERRORS:'
+
 #Regex patterns
 regex1 = r"^\w+"
 regex2 = r"^(feat|fix|docs|style|refactor|test|chore)"
@@ -18,46 +21,74 @@ regex2 = r"^(feat|fix|docs|style|refactor|test|chore)"
 def check_format_rules(lineno, line):
     real_lineno = lineno + 1
     if lineno == 0:
-        if len(line) > 50:
-            return "E%d: First line is the HEADER.\n " \
-                " - HEADER is a single line of max. 50 characters that contains a \n" \
-                "  succinct description of the change. It contains a type, an optional \n" \
-                "  scope and a subject\n" \
-                "  + <type> describes the kind of change that this commit is providing. \n" \
-                "    Allowed types are:\n" \
-                "        * feat      - (feature)\n" \
-                "        * fix       - (bug fix)\n" \
-                "        * docs      - (documentation)\n" \
-                "        * style     - (formatting, missing semi colons,...)\n" \
-                "        * refactor  - (refactor)\n" \
-                "        * test      - (when adding missing tests)\n" \
-                "        * chore     - (maintain)\n" \
-                "  + <scope> can be anything specifying place of the commit change\n" \
-                "  + <subject> is a very short description of the change, in the \n" \
-                "    following format:\n" \
-                "        * imperative, present tense: “change” not “changed” / “changes”\n" \
-                "        * no capitalized first letter\n" \
-                "        * no dot (.) at the end" % (real_lineno,)
+        words = line.split(' ')
+        r1 = re.search(regex1, line, re.IGNORECASE | re.DOTALL | re.UNICODE)
+        r2 = bool(re.search(regex2, r1.group()))
+        r3 = bool(re.search(regex2, words[0]))
+        col_index = line.find(":")
+        header_length = len(line)
+        header_error = ""
+        header_format = "\n  HEADER SYNTAX:\n" \
+        "  <type>:(refs <scope>) <subject>\n"
+        header_type_error = "  Allowed types are:\n" \
+            "    * feat      - (feature)\n" \
+            "    * fix       - (bug fix)\n" \
+            "    * docs      - (documentation)\n" \
+            "    * style     - (formatting, missing semi colons,...)\n" \
+            "    * refactor  - (refactor)\n" \
+            "    * test      - (when adding missing tests)\n" \
+            "    * chore     - (maintain)"
+        if not r2:
+            return "E%d: First word must be a valid <type>\n%s%s" % (real_lineno, header_format, header_type_error)
+        else:
+            if r2 == r3:
+                if col_index > -1:
+                    s1 = line.find("(")
+                    s2 = line.find(")")
+                    ss = line.split(':')[1]
+                    scope = ss[ss.find("(")+1:ss.find(")")]
+                    if col_index < 10:
+                        if s1 == -1:
+                            header_error +="  Opening Parenthesis '(' is missing\n"
+                        if not s1 == col_index+1:
+                            header_error += "  <scope> is missing \n"
+                        else:
+                            if s1 > col_index+1:
+                                header_error +="  <scope> is missplaced \n"
+                            else:
+                                if s2 == -1:
+                                    header_error +="  Closing Parenthesis ')' is missing\n"
+                        if s1+1 == s2 or scope == ' ':
+                            header_error +="  <scope> is empty \n"
+                        if s2 > -1 and (not (len(line)-1) == (s2+len(line.split(")",1)[1]))):
+                            header_error +="  <subject> is missing\n "
+
+                        if len(header_error)>0:
+                            return "E%d: %s%s\n" % (real_lineno, header_error, header_format)
+                    else:
+                        return "E%d: <scope> is missplaced \n%s " % (real_lineno, header_format)
+                else:
+                    return "E%d: ':' is missing\n%s " % (real_lineno, header_format)
+                if len(line) > 50:
+                    return "E%d: First line should be less than 50 characters " \
+                            "in length." % (real_lineno,)
     if lineno == 1:
         if line:
-            return "E%d: Second line should be a blank line" % (real_lineno,real_lineno)
+            return "E%d: Second line should be a blank line" % (real_lineno,)
     if lineno == 2:
         if line.startswith('#') or not len(line) > 0:
             return "E%d: Third line should be BODY.\n" \
                 "   The BODY should include the motivation for the change and contrast this\n" \
                 "   with previous behavior, and must be phrased in imperative present tense" % (real_lineno,)
-    if lineno == 3:
-        if line:
-            return "E%d: Line no %d should be a blank line" % (real_lineno,real_lineno)
-    if lineno == 4:
-        if line.startswith('#') or not len(line) > 0:
-            return "E%d: Last line is FOOTER, it should contain references.\n" \
-                "  The FOOTER should contain any information about Breaking Changes and is" 
-                "  also the place to reference GitHub issues that this commit closes" % (real_lineno,)
+    # if lineno == 3:
+    #     if line:
+    #         return "E%d: Line no %d should be a blank line" % (real_lineno,real_lineno)
+    # if lineno == 4:
+    #     if line.startswith('#') or not len(line) > 0:
+    #         return "E%d: Last line should contain references.\n" % (real_lineno,)
     if not line.startswith('#'):
         if len(line) > 72:
             return "E%d: No line should be over 72 characters long." % (real_lineno,)
-
     return False
 
 def read_commit_message():
